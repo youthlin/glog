@@ -1,0 +1,2 @@
+# glog
+my go blog
