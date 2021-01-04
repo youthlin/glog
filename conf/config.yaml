@@ -1,6 +1,6 @@
 web:
   addr: :8088
-  mode: release
+  mode: debug
 log:
   - name: console # 控制台输出所有日志
     enable: true

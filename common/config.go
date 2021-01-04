@@ -1,8 +1,10 @@
 package common
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"go.uber.org/zap"
@@ -14,6 +16,7 @@ import (
 var (
 	appConfig      AppConfig // 全局配置
 	initConfigOnce sync.Once // 初始化配置一次
+	appDir         = "."     // 应用路径
 )
 
 const (
@@ -24,7 +27,27 @@ const (
 
 func mustInitConfig() {
 	initConfigOnce.Do(func() {
-		file, err := os.Open("./conf/config.yaml")
+		executable, err := os.Executable() // 可执行文件完整路径
+		if err != nil {
+			executable = os.Args[0]
+		}
+		executable, err = filepath.EvalSymlinks(executable) // 如果是符号链接 解析出实际路径
+		if err != nil {
+			executable = os.Args[0]
+		}
+		appDir = filepath.Dir(executable)           // 获得可执行文件所在路径
+		confFile := AppFilePath("conf/config.yaml") // 配置文件完整路径
+		if _, err = os.Stat(confFile); os.IsNotExist(err) {
+			appDir = "." // run on GoLand 不存在配置文件，可能是在 GoLand 里直接启动的，使用工作路径(PWD)
+		}
+		appDir, err = filepath.Abs(appDir) // 绝对路径
+		if err != nil {
+			appDir = "."
+		}
+		fmt.Println("app  dir:", appDir)
+		confFile = AppFilePath("conf/config.yaml")
+		fmt.Println("conf file:", confFile)
+		file, err := os.Open(confFile)
 		if err != nil {
 			panic(err)
 		}
@@ -39,9 +62,26 @@ func mustInitConfig() {
 	})
 }
 
+// Config return AppConfig
 func Config() *AppConfig {
 	mustInitConfig()
 	return &appConfig
+}
+
+// AppDir return app dir
+func AppDir() string {
+	mustInitConfig()
+	return appDir
+}
+
+// AppFilePath return file in the app dir
+func AppFilePath(name string) string {
+	join := filepath.Join(appDir, name)
+	abs, err := filepath.Abs(join)
+	if err != nil {
+		return join
+	}
+	return abs
 }
 
 type AppConfig struct {
